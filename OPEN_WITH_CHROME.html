@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Syllabus Memorisation Game</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Use Times New Roman for the syllabus text */
+    .syllabus-text {
+      font-family: "Times New Roman", Times, serif;
+    }
+    /* Underlined input with transparent background */
+    .redacted-input {
+      background-color: transparent;
+      border: 0;
+      border-bottom: 2px solid #ccc;
+      outline: none;
+      text-align: start;
+      padding: 0 2px;
+      min-width: 1ch;
+    }
+    .redacted-input:focus {
+      border-bottom-color: #007aff;
+    }
+    .correct {
+      border-bottom-color: #28a745 !important;
+    }
+    .incorrect {
+      border-bottom-color: #dc3545 !important;
+    }
+    .input-wrapper {
+      display: inline-flex;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+    }
+    .hint-button {
+      font-size: 0.75rem;
+      padding: 0 0.25rem;
+      margin-left: 0.25rem;
+      color: #2563eb;
+    }
+    .hint-button:hover {
+      color: #1d4ed8;
+    }
+    .correct-answer {
+      font-size: 0.75rem;
+      color: #6b7280;
+      display: block;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+<!-- START SCREEN -->
+<div id="start-screen" class="max-w-3xl mx-auto p-8 bg-white mt-8 shadow-lg rounded-lg">
+  <h1 class="text-3xl font-semibold mb-4 text-center">Syllabus Memorisation Game</h1>
+  <p class="mb-6 text-center">Select a redaction mode to begin. This tool helps you memorise the syllabus by hiding words that you must fill in correctly.</p>
+  
+  <!-- Mode Selection & Descriptions -->
+  <div class="mb-6">
+    <label for="mode-select" class="block font-medium mb-2">Choose Redaction Mode:</label>
+    <select id="mode-select" class="border p-2 rounded w-full">
+      <option value="random">Random Redaction</option>
+      <option value="full">Full Redaction</option>
+      <option value="key">Redact Key Words</option>
+      <option value="cloze">Cloze Test Mode</option>
+      <option value="progressive">Progressive Reveal Mode</option>
+    </select>
+  </div>
+
+  <!-- Mode Explanations -->
+  <div class="bg-gray-50 p-4 rounded mb-6">
+    <p class="font-semibold mb-2">Mode Descriptions:</p>
+    <ul class="list-disc list-inside text-sm">
+      <li><strong>Random Redaction:</strong> Randomly hides a percentage of words (you choose the percentage).</li>
+      <li><strong>Full Redaction:</strong> Every word is hidden.</li>
+      <li><strong>Redact Key Words:</strong> Hides key words (words longer than 4 letters) with options to leave the first letter or random letters visible.</li>
+      <li><strong>Cloze Test Mode:</strong> Every third word is hidden.</li>
+      <li><strong>Progressive Reveal Mode:</strong> All words are hidden, but you can click a "Hint" button to reveal letters gradually.</li>
+    </ul>
+  </div>
+
+  <!-- Mode Options -->
+  <div id="options-container" class="mb-6"></div>
+
+  <!-- Start Button -->
+  <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded transition-colors">
+    Start Game
+  </button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="hidden max-w-3xl mx-auto p-8 bg-white mt-8 shadow-lg rounded-lg">
+  <div id="syllabus-container" class="syllabus-text whitespace-pre-wrap mb-6"></div>
+  <div class="flex items-center space-x-4">
+    <button id="mark-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors">
+      Mark
+    </button>
+    <button id="back-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded transition-colors">
+      Back to Home
+    </button>
+  </div>
+  <div id="score-container" class="mt-6"></div>
+</div>
+
+<script>
+  /******************************************************************
+   * FULL SYLLABUS TEXT WITH HEADINGS (Italicised) AND ITEMS
+   * BELOW HEADINGS INDENTED.
+   ******************************************************************/
+  const syllabusText = `<em>role of marketing</em>
+● strategic role of marketing goods and services
+● interdependence with other key business functions
+● production, selling, marketing approaches
+● types of markets – resource, industrial, intermediate, consumer, mass, niche
+
+<em>influences on marketing</em>
+● factors influencing customer choice – psychological, sociocultural, economic, government
+● consumer laws
+   – deceptive and misleading advertising
+   – price discrimination
+   – implied conditions
+   – warranties
+
+● ethical – truth, accuracy and good taste in advertising, products that may damage health, engaging in fair competition, sugging
+
+<em>marketing process</em>
+● situational analysis – SWOT, product life cycle
+● market research
+● establishing market objectives
+● identifying target markets
+● developing marketing strategies
+● implementation, monitoring and controlling – developing a financial forecast; comparing actual and planned results, revising the marketing strategy
+
+<em>marketing strategies</em>
+● market segmentation, product/service differentiation and positioning
+● products – goods and/or services
+   – branding
+   – packaging
+● price including pricing methods – cost, market, competition-based
+   – pricing strategies – skimming, penetration, loss leaders, price points
+   – price and quality interaction
+● promotion
+   – elements of the promotion mix – advertising, personal selling and relationship marketing, sales promotions, publicity and public relations
+   – the communication process – opinion leaders, word of mouth
+● place/distribution
+   – distribution channels
+   – channel choice – intensive, selective, exclusive
+   – physical distribution issues – transport, warehousing, inventory`;
+
+  // Global array to store references to redacted items for marking
+  let redactedElements = [];
+
+  /******************************************************************
+   * 1) SPLIT THE SYLLABUS INTO LINES.
+   ******************************************************************/
+  function splitIntoLines(text) {
+    return text.split("\n");
+  }
+
+  /******************************************************************
+   * 2) TOKENISE A LINE INTO WORDS AND NON-Word Tokens.
+   ******************************************************************/
+  function tokenize(line) {
+    return line.match(/(\w+|\W+)/g) || [];
+  }
+
+  /******************************************************************
+   * 3) CREATE THE REDACTED HTML FOR THE SYLLABUS.
+   *    - Each line is wrapped in a <p> element (with flex layout for tokens).
+   *    - If the line is a heading (contains <em> tags), output it as HTML.
+   *    - Lines following a heading are indented.
+   ******************************************************************/
+  function createRedactedHTML(lines, mode, options) {
+    redactedElements = []; // Reset previous redacted items
+    let html = "";
+    let indent = false;  // Flag to indicate if the current line should be indented
+    let wordCounter = 0; // Used in cloze mode
+
+    lines.forEach((line) => {
+      const trimmedLine = line.trim();
+      // Detect if the line is a heading (by presence of <em> tags)
+      const isHeading = /<em>.*<\/em>/.test(line);
+      
+      // Reset indent on empty lines
+      if (trimmedLine === "") {
+        indent = false;
+      }
+      
+      // Build the class string for the line container
+      let lineClass = "flex flex-wrap items-center gap-x-1";
+      if (!isHeading && indent && trimmedLine !== "") {
+        lineClass += " ml-6";
+      }
+      
+      let lineHTML = "";
+      
+      // If the line is a heading, output it as is (preserving HTML tags)
+      if (isHeading) {
+        lineHTML = line;
+      } else {
+        // Tokenise the line and process each token
+        const tokens = tokenize(line);
+        tokens.forEach((token) => {
+          if (/\w/.test(token)) {
+            let redact = false;
+            let displayedToken = token;
+            
+            switch (mode) {
+              case "random":
+                if (Math.random() * 100 < (options.redactPercentage || 50)) {
+                  redact = true;
+                }
+                break;
+              case "full":
+                redact = true;
+                break;
+              case "key":
+                if (token.length > 4) {
+                  redact = true;
+                  if (options.keyOption === "first") {
+                    displayedToken = token[0] + "_".repeat(token.length - 1);
+                  } else if (options.keyOption === "random") {
+                    let newToken = "";
+                    for (let i = 0; i < token.length; i++) {
+                      newToken += Math.random() < 0.3 ? token[i] : "_";
+                    }
+                    displayedToken = newToken;
+                  }
+                }
+                break;
+              case "cloze":
+                if (wordCounter % 3 === 2) {
+                  redact = true;
+                }
+                wordCounter++;
+                break;
+              case "progressive":
+                redact = true;
+                break;
+            }
+            
+            if (redact) {
+              const inputId = "input-" + redactedElements.length;
+              // Create an input field with width based on the word length plus a small buffer
+              const width = Math.max(token.length, 1) + 0.5;
+              
+              if (mode === "progressive") {
+                lineHTML += `<span class="input-wrapper">
+                  <span class="flex flex-col">
+                    <input type="text" id="${inputId}" data-answer="${token}" 
+                      class="redacted-input syllabus-text" 
+                      style="width: ${width}ch;" maxLength="${token.length}" />
+                  </span>
+                  <button type="button" class="hint-button" onclick="giveHint('${inputId}')">Hint</button>
+                </span>`;
+              } else {
+                lineHTML += `<span class="input-wrapper">
+                  <span class="flex flex-col">
+                    <input type="text" id="${inputId}" data-answer="${token}" 
+                      class="redacted-input syllabus-text" 
+                      style="width: ${width}ch;" maxLength="${token.length}" />
+                  </span>
+                </span>`;
+              }
+              
+              redactedElements.push({ id: inputId, answer: token });
+            } else {
+              // Output the token as is.
+              lineHTML += token;
+            }
+          } else {
+            // Non-word token: output as is.
+            lineHTML += token;
+          }
+        });
+      }
+      
+      // If the line is a heading, set indent flag for following lines.
+      if (isHeading) {
+        indent = true;
+      }
+      
+      // Wrap the processed line in a <p> element.
+      html += `<p class="${lineClass}">${lineHTML}</p>`;
+    });
+    return html;
+  }
+
+  /******************************************************************
+   * 4) PROGRESSIVE MODE: GIVE HINT (Reveal letters gradually)
+   ******************************************************************/
+  function giveHint(id) {
+    const input = document.getElementById(id);
+    const answer = input.getAttribute("data-answer");
+    let revealedCount = parseInt(input.getAttribute("data-revealed") || "0");
+    revealedCount = Math.min(revealedCount + 1, answer.length);
+    input.setAttribute("data-revealed", revealedCount);
+    const revealed = answer.substring(0, revealedCount);
+    const hidden = "_".repeat(answer.length - revealedCount);
+    input.placeholder = revealed + hidden;
+  }
+
+  /******************************************************************
+   * 5) MARK ANSWERS: Highlight correct/incorrect answers and show score.
+   ******************************************************************/
+  function markAnswers() {
+    let correctCount = 0;
+    redactedElements.forEach((item) => {
+      const inputEl = document.getElementById(item.id);
+      const userAnswer = inputEl.value.trim();
+      const correctAnswer = item.answer;
+      const inputWrapper = inputEl.closest('.input-wrapper');
+      const parentSpan = inputEl.parentNode;
+      
+      // Remove previous answer feedback if it exists
+      const existingFeedback = parentSpan.querySelector('.correct-answer');
+      if (existingFeedback) {
+        existingFeedback.remove();
+      }
+      
+      if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+        inputEl.classList.remove("incorrect");
+        inputEl.classList.add("correct");
+        correctCount++;
+      } else {
+        inputEl.classList.remove("correct");
+        inputEl.classList.add("incorrect");
+        
+        // Create and append correct answer above the input
+        const corrSpan = document.createElement("span");
+        corrSpan.className = "correct-answer";
+        corrSpan.textContent = correctAnswer;
+        parentSpan.insertBefore(corrSpan, inputEl);
+      }
+    });
+    
+    const score = Math.round((correctCount / redactedElements.length) * 100) || 0;
+    document.getElementById("score-container").innerHTML = `<p class="text-xl font-semibold mt-2">Score: ${score}%</p>`;
+  }
+
+  /******************************************************************
+   * 6) UI HANDLING: Start Screen vs. Game Screen and Mode Options.
+   ******************************************************************/
+  const startScreen = document.getElementById("start-screen");
+  const gameScreen = document.getElementById("game-screen");
+  const optionsContainer = document.getElementById("options-container");
+  const modeSelect = document.getElementById("mode-select");
+  const syllabusContainer = document.getElementById("syllabus-container");
+  const markBtn = document.getElementById("mark-btn");
+  const backBtn = document.getElementById("back-btn");
+
+  // Populate mode options based on the selected mode.
+  modeSelect.addEventListener("change", function () {
+    const mode = this.value;
+    optionsContainer.innerHTML = "";
+    if (mode === "random") {
+      optionsContainer.innerHTML = `
+        <label for="random-percentage" class="block font-medium mb-1">Redaction Percentage:</label>
+        <input type="number" id="random-percentage" min="0" max="100" value="50"
+               class="border rounded w-full p-2 mb-2" />
+        <p class="text-sm text-gray-600">Enter a number between 0 and 100.</p>
+      `;
+    } else if (mode === "key") {
+      optionsContainer.innerHTML = `
+        <p class="font-medium mb-2">Key Word Redaction Style:</p>
+        <div class="mb-2">
+          <label class="inline-flex items-center mr-4">
+            <input type="radio" name="keyOption" value="first" checked class="mr-1"/>
+            <span>Leave First Letter</span>
+          </label>
+          <label class="inline-flex items-center">
+            <input type="radio" name="keyOption" value="random" class="mr-1"/>
+            <span>Leave Random Letters</span>
+          </label>
+        </div>
+      `;
+    }
+  });
+
+  // Trigger change event on load so the default mode options appear.
+  modeSelect.dispatchEvent(new Event('change'));
+
+  // Start Game button handler.
+  document.getElementById("start-btn").addEventListener("click", function () {
+    const mode = modeSelect.value;
+    const lines = splitIntoLines(syllabusText);
+    let options = {};
+    if (mode === "random") {
+      const inputEl = document.getElementById("random-percentage");
+      options.redactPercentage = parseInt(inputEl.value) || 50;
+    } else if (mode === "key") {
+      const keyOptionEl = document.querySelector('input[name="keyOption"]:checked');
+      options.keyOption = keyOptionEl ? keyOptionEl.value : "first";
+    }
+    const redactedHTML = createRedactedHTML(lines, mode, options);
+    syllabusContainer.innerHTML = redactedHTML;
+    startScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    document.getElementById("score-container").innerHTML = "";
+  });
+
+  // Mark button handler.
+  markBtn.addEventListener("click", markAnswers);
+
+  // Back to Home button handler.
+  backBtn.addEventListener("click", function () {
+    gameScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+  });
+</script>
+
+</body>
+</html>
