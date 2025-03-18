@@ -80,7 +80,7 @@
       <li><strong>Full Redaction:</strong> Every word is hidden.</li>
       <li><strong>Redact Key Words:</strong> Hides key words (words longer than 4 letters) with options to leave the first letter or random letters visible.</li>
       <li><strong>Cloze Test Mode:</strong> Every third word is hidden.</li>
-      <li><strong>Progressive Reveal Mode:</strong> All words are hidden, but you can click a "Hint" button to reveal letters gradually.</li>
+      <li><strong>Progressive Reveal Mode:</strong> All words are hidden, but you can click a "?" button to reveal letters gradually.</li>
     </ul>
   </div>
 
@@ -256,7 +256,7 @@
                       class="redacted-input syllabus-text" 
                       style="width: ${width}ch;" maxLength="${token.length}" />
                   </span>
-                  <button type="button" class="hint-button" onclick="giveHint('${inputId}')">Hint</button>
+                  <button type="button" class="hint-button" onclick="giveHint('${inputId}')">?</button>
                 </span>`;
               } else {
                 lineHTML += `<span class="input-wrapper">
